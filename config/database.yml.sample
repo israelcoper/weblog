@@ -1,0 +1,26 @@
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  # When the DATABASE_URL environment variable is set (e.g. in Docker via docker-compose.yml),
+  # Rails automatically uses it and merges it with these settings — no explicit reference needed here.
+  # Example: DATABASE_URL=postgres://weblog:password@postgres/weblog_development
+  # url: <%= ENV["DATABASE_URL"] %>
+
+
+development:
+  <<: *default
+  database: weblog_development
+  host: <%= ENV.fetch("DB_HOST", "localhost") %>
+  username: <%= ENV.fetch("DB_USERNAME", "weblog") %>
+  password: <%= ENV.fetch("DB_PASSWORD", "password") %>
+
+test:
+  <<: *default
+  database: weblog_test
+
+production:
+  <<: *default
+  database: weblog_production
+  username: weblog
+  password: <%= ENV["WEBLOG_DATABASE_PASSWORD"] %>
