@@ -30,6 +30,9 @@ WORKDIR /app
 COPY --from=builder /usr/local/bundle /usr/local/bundle
 COPY --chown=rails:rails . .
 
+RUN mkdir -p /app/tmp/pids /app/tmp/cache /app/tmp/sockets && \
+    chown -R rails:rails /app/tmp
+
 USER rails
 
 ENV RAILS_ENV=development \
