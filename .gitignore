@@ -37,3 +37,9 @@
 
 # Ignore database.yml file
 /config/database.yml
+
+# Terraform
+/terraform/.terraform/
+/terraform/terraform.tfvars
+/terraform/*.tfstate
+/terraform/*.tfstate.backup

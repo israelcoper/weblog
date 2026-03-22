@@ -165,6 +165,75 @@ Delete in this order to avoid dependency errors:
 
 ## Part 2 — Infrastructure as Code (Terraform)
 
-See the [`terraform/`](terraform/) directory (coming soon).
+Provisions the same AWS resources as Part 1 using Terraform. See the [`terraform/`](terraform/) directory.
 
-Covers provisioning all of the above AWS resources using Terraform with the same defaults, plus teardown via `terraform destroy`.
+### Prerequisites
+- Terraform installed (`brew install terraform`)
+- AWS CLI configured with `--profile terraform`
+
+### Step 1 — Fill in Variables
+
+Copy the sample and set values accordingly:
+
+```bash
+cp terraform/terraform.tfvars.sample terraform/terraform.tfvars
+```
+
+Then edit `terraform/terraform.tfvars`:
+
+```hcl
+db_password     = "your-strong-password"
+secret_key_base = "output-of-rails-secret"
+```
+
+> Generate `secret_key_base` locally: `rails secret`
+
+### Step 2 — Initialize and Apply
+
+```bash
+cd terraform
+terraform init
+terraform plan
+terraform apply  # type 'yes' to confirm
+```
+
+### Step 3 — Push Image to ECR
+
+After `terraform apply`, use the `ecr_url` output to push your image:
+
+```bash
+# Authenticate
+aws ecr get-login-password --region ap-southeast-1 --profile terraform | \
+  docker login --username AWS --password-stdin <ecr_url>
+
+# Build, tag, push
+docker build --platform linux/amd64 -t weblog .
+docker tag weblog:latest <ecr_url>:latest
+docker push <ecr_url>:latest
+```
+
+### Step 4 — Run DB Migration (One-off Task)
+
+Same as Part 1 Step 5 — run a one-off ECS task with the command override:
+
+```
+bin/rails,db:create,db:migrate
+```
+
+### Step 5 — Verify
+
+```bash
+# Get the public IP from the running ECS task in the console, then:
+curl http://<public-ip>:3000/up
+```
+
+A `200 OK` confirms the app is running.
+
+### Teardown
+
+```bash
+cd terraform
+terraform destroy  # type 'yes' to confirm
+```
+
+This deletes all provisioned resources. No manual cleanup needed.
