@@ -1,9 +1,11 @@
 name: Deploy to ECS
 
 on:
-  push:
+  pull_request:
     branches:
-      - main
+      - production
+    types:
+      - closed
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
@@ -19,6 +21,7 @@ jobs:
   deploy:
     name: Build and Deploy
     runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
 
     steps:
       - name: Checkout code
