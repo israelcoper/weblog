@@ -1,2 +1,3 @@
 db_password     = "your-strong-password"
 secret_key_base = "output-of-rails-secret"
+github_repo     = "owner/repo"

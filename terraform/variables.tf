@@ -12,5 +12,4 @@ variable "secret_key_base" {
 
 variable "github_repo" {
   description = "GitHub repository in owner/repo format (e.g. octocat/weblog)"
-  default = "israelcoper/weblog"
 }
