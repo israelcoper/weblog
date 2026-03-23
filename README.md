@@ -16,6 +16,40 @@ A Rails API application used as a learning project for deploying to AWS ECS — 
 
 ---
 
+## Local Development
+
+### Prerequisites
+- Ruby 3.2.2 (`rbenv` or `asdf`)
+- Docker + Docker Compose
+
+### Setup
+
+```bash
+# Copy config files
+cp config/database.yml.sample config/database.yml
+cp docker-compose.yml.sample docker-compose.yml
+```
+
+### Run with Docker Compose
+
+```bash
+docker compose up --build
+```
+
+### First-time database setup
+
+```bash
+docker compose exec weblog bin/rails db:create db:migrate
+```
+
+### Verify
+
+```bash
+curl http://localhost:3000/up
+```
+
+---
+
 ## Infrastructure
 
 | AWS Service | Purpose |
