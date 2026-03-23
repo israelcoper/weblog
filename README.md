@@ -103,12 +103,36 @@ docker push <account-id>.dkr.ecr.ap-southeast-1.amazonaws.com/weblog:latest
 
 ### Step 5 — Run DB Migration (One-off Task)
 
+**Option A — AWS Console:**
+
 1. Go to **ECS → Clusters → weblog-cluster → Run new task**
 2. Launch type: Fargate | Task definition: `weblog-task`
 3. Networking: default VPC, any public subnet
 4. Security group: allow all outbound (port range: all)
 5. Scroll down to **Container overrides** → expand it → find the `weblog` container → **Command override** field → enter: `bin/rails,db:create,db:migrate`
 6. Click **Run task** and wait for it to stop with exit code `0`
+
+**Option B — AWS CLI:**
+
+```bash
+# Get a subnet ID from your default VPC
+aws ec2 describe-subnets \
+  --filters Name=default-for-az,Values=true \
+  --query 'Subnets[0].SubnetId' \
+  --output text \
+  --region ap-southeast-1 --profile terraform
+
+# Run the migration task
+aws ecs run-task \
+  --cluster weblog-cluster \
+  --task-definition weblog-task \
+  --launch-type FARGATE \
+  --network-configuration "awsvpcConfiguration={subnets=[<subnet-id>],assignPublicIp=ENABLED}" \
+  --overrides '{"containerOverrides":[{"name":"weblog","command":["bin/rails","db:create","db:migrate"]}]}' \
+  --region ap-southeast-1 --profile terraform
+```
+
+Check CloudWatch logs to confirm the task exited with code `0`.
 
 > **Note:** If the task exits with code `1`, check the **Logs** tab. Common causes: `Permission denied on /app/tmp` means the Docker image was built without pre-creating the tmp directories (rebuild and push); socket connection errors mean `DATABASE_URL` is wrong in the task definition (create a new revision with the correct value).
 
@@ -197,6 +221,13 @@ terraform plan
 terraform apply  # type 'yes' to confirm
 ```
 
+> **Note:** If `terraform apply` fails with `EntityAlreadyExists` on the GitHub OIDC provider, it means your AWS account already has one (only one is allowed per account). Import it into Terraform state instead of creating a new one:
+> ```bash
+> terraform import aws_iam_openid_connect_provider.github \
+>   arn:aws:iam::<account-id>:oidc-provider/token.actions.githubusercontent.com
+> ```
+> After importing, run `terraform plan` — if it shows no changes, proceed. If it shows a diff, run `terraform apply` to reconcile.
+
 ### Step 3 — Push Image to ECR
 
 After `terraform apply`, use the `ecr_url` output to push your image:
@@ -237,3 +268,59 @@ terraform destroy  # type 'yes' to confirm
 ```
 
 This deletes all provisioned resources. No manual cleanup needed.
+
+---
+
+## Part 3 — Automated Deployment (GitHub Actions)
+
+Automates building and deploying the Docker image to ECS on every push to `main`. See [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml).
+
+### Prerequisites
+- AWS infrastructure provisioned via Terraform (Part 2) — OIDC and the GitHub Actions IAM role are created automatically
+- GitHub repository with Actions enabled
+
+### Step 1 — Get the Role ARN from Terraform
+
+```bash
+cd terraform
+terraform output github_actions_role_arn
+```
+
+### Step 2 — Add GitHub Secrets
+
+Go to your GitHub repo → **Settings → Secrets and variables → Actions → New repository secret**
+
+Add the following secrets:
+
+| Secret | Value |
+|--------|-------|
+| `AWS_ROLE_ARN` | output of `terraform output github_actions_role_arn` |
+| `AWS_REGION` | `ap-southeast-1` |
+| `ECR_REPOSITORY` | `weblog` |
+| `ECS_CLUSTER` | `weblog-cluster` |
+| `ECS_SERVICE` | `weblog-service` |
+
+> **Note:** No AWS access keys needed — authentication uses OIDC, which lets GitHub Actions assume the IAM role securely without storing long-lived credentials.
+
+### Step 3 — Deploy
+
+Push to `main` to trigger the workflow:
+
+```bash
+git push origin main
+```
+
+The workflow will:
+1. Build the Docker image tagged with the git commit SHA
+2. Push both `:<sha>` and `:latest` tags to ECR
+3. Force a new ECS deployment to pull the latest image
+
+### Step 4 — Verify
+
+1. Go to **GitHub → Actions** tab → confirm the workflow passes
+2. Go to **ECS → Clusters → weblog-cluster → Services → weblog-service** → confirm a new task is running
+3. Verify the app:
+
+```bash
+curl http://<public-ip>:3000/up
+```
