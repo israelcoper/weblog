@@ -338,11 +338,7 @@ Add the following secrets:
 
 ### Step 3 — Deploy
 
-Push to `main` to trigger the workflow:
-
-```bash
-git push origin main
-```
+Merge a pull request into the `production` branch to trigger the workflow.
 
 The workflow will:
 1. Build the Docker image tagged with the git commit SHA
